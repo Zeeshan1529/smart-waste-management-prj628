@@ -6,7 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from .db import Base, engine, get_db
-from .models import CollectionTask, WasteBin, WasteReport
+from .models import AuditLog, CollectionTask, WasteBin, WasteReport
 from .schemas import (
     BinCreate,
     BinFillUpdate,
@@ -19,6 +19,8 @@ from .schemas import (
     WasteReportOut,
 )
 from .services import collection_priority, priority_score
+from .security import require_roles
+from .audit import write_audit
 
 
 Base.metadata.create_all(bind=engine)
@@ -69,6 +71,7 @@ def list_bins(db: Session = Depends(get_db)):
 def create_bin(
     payload: BinCreate,
     db: Session = Depends(get_db),
+    current_user=Depends(require_roles("OPERATOR", "ADMIN")),
 ):
     existing = (
         db.query(WasteBin)
@@ -88,6 +91,16 @@ def create_bin(
     )
 
     db.add(row)
+    db.flush()
+
+    write_audit(
+        db,
+        current_user,
+        "CREATE",
+        "waste_bins",
+        f"Created bin {row.code}",
+    )
+
     db.commit()
     db.refresh(row)
 
@@ -99,6 +112,7 @@ def update_bin_fill(
     bin_id: int,
     payload: BinFillUpdate,
     db: Session = Depends(get_db),
+    current_user=Depends(require_roles("OPERATOR", "ADMIN")),
 ):
     row = db.get(WasteBin, bin_id)
 
@@ -110,6 +124,14 @@ def update_bin_fill(
 
     row.fill_level = payload.fill_level
     row.updated_at = datetime.utcnow()
+
+    write_audit(
+        db,
+        current_user,
+        "UPDATE_FILL",
+        "waste_bins",
+        f"Updated {row.code} fill to {row.fill_level}%",
+    )
 
     db.commit()
     db.refresh(row)
@@ -210,6 +232,7 @@ def list_reports(db: Session = Depends(get_db)):
 def create_report(
     payload: WasteReportCreate,
     db: Session = Depends(get_db),
+    current_user=Depends(require_roles("CITIZEN", "ADMIN")),
 ):
     row = WasteReport(**payload.model_dump())
 
@@ -225,6 +248,7 @@ def update_report_status(
     report_id: int,
     payload: ReportStatusUpdate,
     db: Session = Depends(get_db),
+    current_user=Depends(require_roles("OPERATOR", "ADMIN")),
 ):
     row = db.get(WasteReport, report_id)
 
@@ -235,6 +259,14 @@ def update_report_status(
         )
 
     row.status = payload.status
+
+    write_audit(
+        db,
+        current_user,
+        "UPDATE_STATUS",
+        "waste_reports",
+        f"Report {row.id} status changed to {row.status}",
+    )
 
     db.commit()
     db.refresh(row)
@@ -265,6 +297,7 @@ def list_collection_tasks(db: Session = Depends(get_db)):
 def create_collection_task(
     payload: CollectionTaskCreate,
     db: Session = Depends(get_db),
+    current_user=Depends(require_roles("OPERATOR", "ADMIN")),
 ):
     bin_row = db.get(WasteBin, payload.bin_id)
 
@@ -308,6 +341,15 @@ def create_collection_task(
     )
 
     db.add(task)
+    db.flush()
+
+    write_audit(
+        db,
+        current_user,
+        "CREATE",
+        "collection_tasks",
+        f"Created collection task {task.id}",
+    )
 
     if report_row and report_row.status in {
         "OPEN",
@@ -329,6 +371,7 @@ def update_collection_task_status(
     task_id: int,
     payload: TaskStatusUpdate,
     db: Session = Depends(get_db),
+    current_user=Depends(require_roles("OPERATOR", "ADMIN")),
 ):
     task = db.get(CollectionTask, task_id)
 
@@ -362,6 +405,14 @@ def update_collection_task_status(
 
     elif payload.status != "COMPLETED":
         task.completed_at = None
+
+    write_audit(
+        db,
+        current_user,
+        "UPDATE_STATUS",
+        "collection_tasks",
+        f"Task {task.id} status changed to {task.status}",
+    )
 
     db.commit()
     db.refresh(task)
@@ -573,6 +624,7 @@ def list_recyclers(db: Session = Depends(get_db)):
 def create_recycler(
     payload: RecyclerCreate,
     db: Session = Depends(get_db),
+    current_user=Depends(require_roles("ADMIN")),
 ):
     existing = (
         db.query(Recycler)
@@ -619,6 +671,7 @@ def list_material_listings(
 def create_material_listing(
     payload: MaterialListingCreate,
     db: Session = Depends(get_db),
+    current_user=Depends(require_roles("RECYCLER", "ADMIN")),
 ):
     if payload.source_report_id is not None:
         report = db.get(
@@ -660,6 +713,7 @@ def create_material_listing(
 def match_material_listing(
     listing_id: int,
     db: Session = Depends(get_db),
+    current_user=Depends(require_roles("RECYCLER", "ADMIN")),
 ):
     listing = db.get(
         MaterialListing,
@@ -729,6 +783,7 @@ def update_material_listing_status(
     listing_id: int,
     payload: MaterialListingStatusUpdate,
     db: Session = Depends(get_db),
+    current_user=Depends(require_roles("RECYCLER", "ADMIN")),
 ):
     listing = db.get(
         MaterialListing,
@@ -772,6 +827,7 @@ def list_transactions(
 def create_transaction(
     payload: MarketplaceTransactionCreate,
     db: Session = Depends(get_db),
+    current_user=Depends(require_roles("RECYCLER", "ADMIN")),
 ):
     listing = db.get(
         MaterialListing,
@@ -849,6 +905,7 @@ def update_transaction_status(
     transaction_id: int,
     payload: MarketplaceTransactionStatusUpdate,
     db: Session = Depends(get_db),
+    current_user=Depends(require_roles("RECYCLER", "ADMIN")),
 ):
     transaction = db.get(
         MarketplaceTransaction,
@@ -949,3 +1006,12 @@ def optimize_collection_route(
         start_latitude=payload.start_latitude,
         start_longitude=payload.start_longitude,
     )
+
+
+# -------------------------------------------------------------------
+# AUTHENTICATION
+# -------------------------------------------------------------------
+
+from .auth_routes import router as auth_router
+
+app.include_router(auth_router)

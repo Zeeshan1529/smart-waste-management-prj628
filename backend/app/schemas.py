@@ -191,3 +191,40 @@ class RouteOptimizeResponse(BaseModel):
     route: list[RouteStop]
     total_distance_km: float
     number_of_stops: int
+
+
+class UserCreate(BaseModel):
+    username: str = Field(min_length=3, max_length=80)
+    email: str = Field(min_length=5, max_length=150)
+    password: str = Field(min_length=8, max_length=128)
+
+    role: Literal[
+        "ADMIN",
+        "OPERATOR",
+        "RECYCLER",
+        "CITIZEN",
+    ] = "CITIZEN"
+
+
+class UserOut(BaseModel):
+    id: int
+    username: str
+    email: str
+    role: str
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class CurrentUserOut(BaseModel):
+    id: int
+    username: str
+    email: str
+    role: str

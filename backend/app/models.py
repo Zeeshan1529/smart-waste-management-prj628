@@ -149,3 +149,77 @@ class MarketplaceTransaction(Base):
         DateTime,
         nullable=True,
     )
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True)
+
+    username = Column(
+        String(80),
+        unique=True,
+        nullable=False,
+    )
+
+    email = Column(
+        String(150),
+        unique=True,
+        nullable=False,
+    )
+
+    hashed_password = Column(
+        String(255),
+        nullable=False,
+    )
+
+    role = Column(
+        String(30),
+        nullable=False,
+        default="CITIZEN",
+    )
+
+    is_active = Column(
+        Integer,
+        default=1,
+        nullable=False,
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+    )
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True)
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+
+    action = Column(
+        String(100),
+        nullable=False,
+    )
+
+    resource = Column(
+        String(100),
+        nullable=False,
+    )
+
+    detail = Column(
+        Text,
+        default="",
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+    )
