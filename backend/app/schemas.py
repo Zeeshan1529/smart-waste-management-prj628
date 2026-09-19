@@ -67,4 +67,25 @@ class CollectionTaskOut(CollectionTaskCreate):
 
 
 class TaskStatusUpdate(BaseModel):
-    status: Literal["PLANNED", "IN_PROGRESS", "COMPLETED", "CANCELLED"]
+    status: Literal[
+        "PLANNED",
+        "IN_PROGRESS",
+        "COMPLETED",
+        "CANCELLED",
+    ]
+
+
+class MLPredictionRequest(BaseModel):
+    ward: str
+    day_of_week: int = Field(ge=0, le=6)
+    month: int = Field(ge=1, le=12)
+    fill_level: float = Field(ge=0, le=100)
+    capacity_kg: float = Field(gt=0)
+    previous_day_kg: float = Field(ge=0)
+    avg_3_day_kg: float = Field(ge=0)
+    avg_7_day_kg: float = Field(ge=0)
+
+
+class MLPredictionResponse(BaseModel):
+    predicted_waste_kg: float
+    model: str

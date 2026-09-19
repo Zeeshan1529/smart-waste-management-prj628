@@ -1,0 +1,10 @@
+{
+  "model": "RandomForestRegressor",
+  "dataset": "simulated operational waste-generation data",
+  "total_rows": 1458,
+  "training_rows": 1166,
+  "testing_rows": 292,
+  "mae_kg": 7.366,
+  "rmse_kg": 9.446,
+  "r2": 0.6785
+}

@@ -460,3 +460,41 @@ def analytics_overview(db: Session = Depends(get_db)):
         "in_progress_tasks": int(in_progress_tasks or 0),
         "completed_tasks": int(completed_tasks or 0),
     }
+
+
+from .ml_service import predict_waste_generation
+from .schemas import (
+    MLPredictionRequest,
+    MLPredictionResponse,
+)
+
+
+@app.post(
+    "/api/ml/predict",
+    response_model=MLPredictionResponse,
+)
+def predict_waste(
+    payload: MLPredictionRequest,
+):
+    try:
+        prediction = predict_waste_generation(
+            ward=payload.ward,
+            day_of_week=payload.day_of_week,
+            month=payload.month,
+            fill_level=payload.fill_level,
+            capacity_kg=payload.capacity_kg,
+            previous_day_kg=payload.previous_day_kg,
+            avg_3_day_kg=payload.avg_3_day_kg,
+            avg_7_day_kg=payload.avg_7_day_kg,
+        )
+
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=str(exc),
+        )
+
+    return {
+        "predicted_waste_kg": prediction,
+        "model": "RandomForestRegressor",
+    }
