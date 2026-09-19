@@ -1,0 +1,73 @@
+{
+  "metrics": {
+    "model": "ResNet18 transfer learning",
+    "dataset": "TrashNet",
+    "classes": [
+      "cardboard",
+      "glass",
+      "metal",
+      "paper",
+      "plastic",
+      "trash"
+    ],
+    "total_images": 2527,
+    "training_images": 2021,
+    "validation_images": 253,
+    "test_images": 253,
+    "best_validation_accuracy": 0.6206,
+    "test_accuracy": 0.6364,
+    "macro_precision": 0.5796,
+    "macro_recall": 0.5419,
+    "macro_f1": 0.5367
+  },
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 1.8300682180061132,
+      "train_accuracy": 0.20682830282038595,
+      "validation_accuracy": 0.308300395256917
+    },
+    {
+      "epoch": 2,
+      "train_loss": 1.692325958693635,
+      "train_accuracy": 0.2909450766947056,
+      "validation_accuracy": 0.3794466403162055
+    },
+    {
+      "epoch": 3,
+      "train_loss": 1.572207300572157,
+      "train_accuracy": 0.3577436912419594,
+      "validation_accuracy": 0.47035573122529645
+    },
+    {
+      "epoch": 4,
+      "train_loss": 1.4662612511461646,
+      "train_accuracy": 0.44433448787728846,
+      "validation_accuracy": 0.5177865612648221
+    },
+    {
+      "epoch": 5,
+      "train_loss": 1.387437344364221,
+      "train_accuracy": 0.47699158832261257,
+      "validation_accuracy": 0.5335968379446641
+    },
+    {
+      "epoch": 6,
+      "train_loss": 1.3164513822477208,
+      "train_accuracy": 0.5363681345868382,
+      "validation_accuracy": 0.5889328063241107
+    },
+    {
+      "epoch": 7,
+      "train_loss": 1.250604832897913,
+      "train_accuracy": 0.5754576942107867,
+      "validation_accuracy": 0.5968379446640316
+    },
+    {
+      "epoch": 8,
+      "train_loss": 1.2241652894291413,
+      "train_accuracy": 0.5799109351806037,
+      "validation_accuracy": 0.6205533596837944
+    }
+  ]
+}
