@@ -22,4 +22,4 @@ if db.query(WasteReport).count() == 0:
 
 db.commit()
 db.close()
-print("Seed complete")
+print("Seed complete - MySQL database initialized with sample PRJ_628 data")

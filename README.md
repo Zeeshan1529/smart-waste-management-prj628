@@ -4,9 +4,9 @@ A modular prototype for CSE7102 Mini Project.
 
 ## Current partial implementation
 - FastAPI backend
-- SQLite database
+- MySQL database with SQLAlchemy ORM
 - Waste-bin monitoring APIs
-- Citizen waste report API
+- Citizen waste-report API
 - Collection-priority engine (rule-based baseline)
 - React dashboard scaffold
 - ML workspace reserved for waste-generation prediction
@@ -21,18 +21,42 @@ A modular prototype for CSE7102 Mini Project.
 6. Add role-based authentication and security controls
 7. Integrate dashboards and measurable impact analytics
 
-## Run backend
+## Database setup (MySQL)
+
+Create the database once in MySQL:
+
+```sql
+CREATE DATABASE prj628;
+```
+
+Copy the environment template:
+
 ```bash
 cd backend
-python -m venv .venv
-# macOS/Linux
+cp .env.example .env
+```
+
+Edit `backend/.env` and set your MySQL password.
+
+> `backend/.env` is ignored by Git and must not be committed to GitHub.
+
+## Run backend
+
+```bash
+cd backend
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+python3 seed.py
 uvicorn app.main:app --reload
 ```
+
 Open http://127.0.0.1:8000/docs
 
+Health check: http://127.0.0.1:8000/health
+
 ## Run frontend
+
 ```bash
 cd frontend
 npm install
