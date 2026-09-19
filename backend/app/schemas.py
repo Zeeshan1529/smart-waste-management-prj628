@@ -89,3 +89,80 @@ class MLPredictionRequest(BaseModel):
 class MLPredictionResponse(BaseModel):
     predicted_waste_kg: float
     model: str
+
+
+class RecyclerCreate(BaseModel):
+    name: str
+    material_types: str
+    ward: str = ""
+    city: str = "Bengaluru"
+    contact_email: str = ""
+
+
+class RecyclerOut(RecyclerCreate):
+    id: int
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MaterialListingCreate(BaseModel):
+    source_report_id: Optional[int] = None
+    material_type: str
+    recovery_stream: Literal[
+        "RECYCLABLE",
+        "RESIDUAL_WASTE",
+    ]
+    quantity_kg: float = Field(gt=0)
+    classification_confidence: Optional[float] = Field(
+        default=None,
+        ge=0,
+        le=1,
+    )
+    source_location: str
+
+
+class MaterialListingOut(MaterialListingCreate):
+    id: int
+    recycler_id: Optional[int] = None
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MaterialListingStatusUpdate(BaseModel):
+    status: Literal[
+        "AVAILABLE",
+        "MATCHED",
+        "RECOVERED",
+        "CANCELLED",
+    ]
+
+
+class MarketplaceTransactionCreate(BaseModel):
+    listing_id: int
+    recycler_id: int
+    quantity_kg: float = Field(gt=0)
+
+
+class MarketplaceTransactionOut(MarketplaceTransactionCreate):
+    id: int
+    status: str
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class MarketplaceTransactionStatusUpdate(BaseModel):
+    status: Literal[
+        "INITIATED",
+        "IN_TRANSIT",
+        "COMPLETED",
+        "CANCELLED",
+    ]

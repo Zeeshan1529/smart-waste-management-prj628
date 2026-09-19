@@ -1,6 +1,14 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 
 from .db import Base
 
@@ -36,25 +44,108 @@ class CollectionTask(Base):
     __tablename__ = "collection_tasks"
 
     id = Column(Integer, primary_key=True)
-
     bin_id = Column(
         Integer,
         ForeignKey("waste_bins.id"),
         nullable=False,
     )
-
     report_id = Column(
         Integer,
         ForeignKey("waste_reports.id"),
         nullable=True,
     )
-
     priority = Column(String(20), default="MEDIUM", nullable=False)
     status = Column(String(30), default="PLANNED", nullable=False)
-
     assigned_to = Column(String(100), default="")
     notes = Column(Text, default="")
-
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     scheduled_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
+
+
+class Recycler(Base):
+    __tablename__ = "recyclers"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(150), unique=True, nullable=False)
+    material_types = Column(String(255), nullable=False)
+    ward = Column(String(100), default="")
+    city = Column(String(100), default="Bengaluru")
+    contact_email = Column(String(150), default="")
+    status = Column(String(30), default="ACTIVE", nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class MaterialListing(Base):
+    __tablename__ = "material_listings"
+
+    id = Column(Integer, primary_key=True)
+
+    source_report_id = Column(
+        Integer,
+        ForeignKey("waste_reports.id"),
+        nullable=True,
+    )
+
+    recycler_id = Column(
+        Integer,
+        ForeignKey("recyclers.id"),
+        nullable=True,
+    )
+
+    material_type = Column(String(80), nullable=False)
+    recovery_stream = Column(String(40), nullable=False)
+
+    quantity_kg = Column(Float, nullable=False)
+    classification_confidence = Column(Float, nullable=True)
+
+    source_location = Column(String(255), nullable=False)
+
+    status = Column(
+        String(30),
+        default="AVAILABLE",
+        nullable=False,
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+    )
+
+
+class MarketplaceTransaction(Base):
+    __tablename__ = "marketplace_transactions"
+
+    id = Column(Integer, primary_key=True)
+
+    listing_id = Column(
+        Integer,
+        ForeignKey("material_listings.id"),
+        nullable=False,
+    )
+
+    recycler_id = Column(
+        Integer,
+        ForeignKey("recyclers.id"),
+        nullable=False,
+    )
+
+    quantity_kg = Column(Float, nullable=False)
+
+    status = Column(
+        String(30),
+        default="INITIATED",
+        nullable=False,
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+    )
+
+    completed_at = Column(
+        DateTime,
+        nullable=True,
+    )

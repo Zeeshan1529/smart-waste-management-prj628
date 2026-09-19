@@ -498,3 +498,386 @@ def predict_waste(
         "predicted_waste_kg": prediction,
         "model": "RandomForestRegressor",
     }
+
+
+from fastapi import File, UploadFile
+from .image_classifier import classify_image
+
+
+@app.post("/api/ml/classify-image")
+async def classify_waste_image(
+    file: UploadFile = File(...),
+):
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=400,
+            detail="Please upload an image file.",
+        )
+
+    try:
+        contents = await file.read()
+
+        from io import BytesIO
+        from PIL import Image
+
+        image = Image.open(
+            BytesIO(contents)
+        )
+
+        result = classify_image(image)
+
+        return {
+            "filename": file.filename,
+            **result,
+        }
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unable to classify image: {exc}",
+        )
+
+
+# -------------------------------------------------------------------
+# CIRCULAR ECONOMY / RECYCLER MARKETPLACE
+# -------------------------------------------------------------------
+
+from .models import (
+    MaterialListing,
+    MarketplaceTransaction,
+    Recycler,
+)
+from .schemas import (
+    MaterialListingCreate,
+    MaterialListingOut,
+    MaterialListingStatusUpdate,
+    MarketplaceTransactionCreate,
+    MarketplaceTransactionOut,
+    MarketplaceTransactionStatusUpdate,
+    RecyclerCreate,
+    RecyclerOut,
+)
+
+
+@app.get("/api/recyclers", response_model=list[RecyclerOut])
+def list_recyclers(db: Session = Depends(get_db)):
+    return (
+        db.query(Recycler)
+        .filter(Recycler.status == "ACTIVE")
+        .order_by(Recycler.name.asc())
+        .all()
+    )
+
+
+@app.post("/api/recyclers", response_model=RecyclerOut)
+def create_recycler(
+    payload: RecyclerCreate,
+    db: Session = Depends(get_db),
+):
+    existing = (
+        db.query(Recycler)
+        .filter(Recycler.name == payload.name)
+        .first()
+    )
+
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail="Recycler already exists",
+        )
+
+    recycler = Recycler(
+        **payload.model_dump(),
+        status="ACTIVE",
+    )
+
+    db.add(recycler)
+    db.commit()
+    db.refresh(recycler)
+
+    return recycler
+
+
+@app.get(
+    "/api/material-listings",
+    response_model=list[MaterialListingOut],
+)
+def list_material_listings(
+    db: Session = Depends(get_db),
+):
+    return (
+        db.query(MaterialListing)
+        .order_by(MaterialListing.id.desc())
+        .all()
+    )
+
+
+@app.post(
+    "/api/material-listings",
+    response_model=MaterialListingOut,
+)
+def create_material_listing(
+    payload: MaterialListingCreate,
+    db: Session = Depends(get_db),
+):
+    if payload.source_report_id is not None:
+        report = db.get(
+            WasteReport,
+            payload.source_report_id,
+        )
+
+        if not report:
+            raise HTTPException(
+                status_code=404,
+                detail="Source waste report not found",
+            )
+
+    if payload.recovery_stream == "RESIDUAL_WASTE":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Residual waste cannot be listed in the "
+                "circular-economy marketplace."
+            ),
+        )
+
+    listing = MaterialListing(
+        **payload.model_dump(),
+        status="AVAILABLE",
+    )
+
+    db.add(listing)
+    db.commit()
+    db.refresh(listing)
+
+    return listing
+
+
+@app.post(
+    "/api/material-listings/{listing_id}/match",
+    response_model=MaterialListingOut,
+)
+def match_material_listing(
+    listing_id: int,
+    db: Session = Depends(get_db),
+):
+    listing = db.get(
+        MaterialListing,
+        listing_id,
+    )
+
+    if not listing:
+        raise HTTPException(
+            status_code=404,
+            detail="Material listing not found",
+        )
+
+    if listing.status not in {
+        "AVAILABLE",
+        "MATCHED",
+    }:
+        raise HTTPException(
+            status_code=400,
+            detail="Listing is not available for matching",
+        )
+
+    material = listing.material_type.strip().lower()
+
+    recyclers = (
+        db.query(Recycler)
+        .filter(Recycler.status == "ACTIVE")
+        .order_by(Recycler.id.asc())
+        .all()
+    )
+
+    matched_recycler = None
+
+    for recycler in recyclers:
+        accepted_materials = {
+            item.strip().lower()
+            for item in recycler.material_types.split(",")
+            if item.strip()
+        }
+
+        if material in accepted_materials:
+            matched_recycler = recycler
+            break
+
+    if matched_recycler is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"No active recycler currently accepts "
+                f"{listing.material_type}"
+            ),
+        )
+
+    listing.recycler_id = matched_recycler.id
+    listing.status = "MATCHED"
+
+    db.commit()
+    db.refresh(listing)
+
+    return listing
+
+
+@app.patch(
+    "/api/material-listings/{listing_id}/status",
+    response_model=MaterialListingOut,
+)
+def update_material_listing_status(
+    listing_id: int,
+    payload: MaterialListingStatusUpdate,
+    db: Session = Depends(get_db),
+):
+    listing = db.get(
+        MaterialListing,
+        listing_id,
+    )
+
+    if not listing:
+        raise HTTPException(
+            status_code=404,
+            detail="Material listing not found",
+        )
+
+    listing.status = payload.status
+
+    db.commit()
+    db.refresh(listing)
+
+    return listing
+
+
+@app.get(
+    "/api/marketplace/transactions",
+    response_model=list[MarketplaceTransactionOut],
+)
+def list_transactions(
+    db: Session = Depends(get_db),
+):
+    return (
+        db.query(MarketplaceTransaction)
+        .order_by(
+            MarketplaceTransaction.id.desc()
+        )
+        .all()
+    )
+
+
+@app.post(
+    "/api/marketplace/transactions",
+    response_model=MarketplaceTransactionOut,
+)
+def create_transaction(
+    payload: MarketplaceTransactionCreate,
+    db: Session = Depends(get_db),
+):
+    listing = db.get(
+        MaterialListing,
+        payload.listing_id,
+    )
+
+    if not listing:
+        raise HTTPException(
+            status_code=404,
+            detail="Material listing not found",
+        )
+
+    recycler = db.get(
+        Recycler,
+        payload.recycler_id,
+    )
+
+    if not recycler or recycler.status != "ACTIVE":
+        raise HTTPException(
+            status_code=404,
+            detail="Active recycler not found",
+        )
+
+    if listing.status not in {
+        "AVAILABLE",
+        "MATCHED",
+    }:
+        raise HTTPException(
+            status_code=400,
+            detail="Listing cannot be transacted",
+        )
+
+    if payload.quantity_kg > listing.quantity_kg:
+        raise HTTPException(
+            status_code=400,
+            detail="Transaction quantity exceeds listing quantity",
+        )
+
+    accepted_materials = {
+        item.strip().lower()
+        for item in recycler.material_types.split(",")
+        if item.strip()
+    }
+
+    if listing.material_type.strip().lower() not in accepted_materials:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Recycler does not accept this material type"
+            ),
+        )
+
+    transaction = MarketplaceTransaction(
+        listing_id=payload.listing_id,
+        recycler_id=payload.recycler_id,
+        quantity_kg=payload.quantity_kg,
+        status="INITIATED",
+    )
+
+    listing.recycler_id = payload.recycler_id
+    listing.status = "MATCHED"
+
+    db.add(transaction)
+    db.commit()
+    db.refresh(transaction)
+
+    return transaction
+
+
+@app.patch(
+    "/api/marketplace/transactions/{transaction_id}/status",
+    response_model=MarketplaceTransactionOut,
+)
+def update_transaction_status(
+    transaction_id: int,
+    payload: MarketplaceTransactionStatusUpdate,
+    db: Session = Depends(get_db),
+):
+    transaction = db.get(
+        MarketplaceTransaction,
+        transaction_id,
+    )
+
+    if not transaction:
+        raise HTTPException(
+            status_code=404,
+            detail="Marketplace transaction not found",
+        )
+
+    transaction.status = payload.status
+
+    if payload.status == "COMPLETED":
+        transaction.completed_at = datetime.utcnow()
+
+        listing = db.get(
+            MaterialListing,
+            transaction.listing_id,
+        )
+
+        if listing:
+            listing.status = "RECOVERED"
+
+    elif payload.status != "COMPLETED":
+        transaction.completed_at = None
+
+    db.commit()
+    db.refresh(transaction)
+
+    return transaction
