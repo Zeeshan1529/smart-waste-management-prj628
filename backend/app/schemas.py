@@ -166,3 +166,28 @@ class MarketplaceTransactionStatusUpdate(BaseModel):
         "COMPLETED",
         "CANCELLED",
     ]
+
+
+class RouteOptimizeRequest(BaseModel):
+    bin_ids: Optional[list[int]] = None
+
+    start_latitude: float
+    start_longitude: float
+
+
+class RouteStop(BaseModel):
+    sequence: int
+    bin_id: int
+    code: str
+    ward: str
+    latitude: float
+    longitude: float
+    fill_level: float
+    priority: str
+    distance_from_previous_km: float
+
+
+class RouteOptimizeResponse(BaseModel):
+    route: list[RouteStop]
+    total_distance_km: float
+    number_of_stops: int

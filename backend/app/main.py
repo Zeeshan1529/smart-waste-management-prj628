@@ -881,3 +881,71 @@ def update_transaction_status(
     db.refresh(transaction)
 
     return transaction
+
+
+from .route_service import optimize_route
+from .schemas import (
+    RouteOptimizeRequest,
+    RouteOptimizeResponse,
+)
+
+
+@app.post(
+    "/api/routes/optimize",
+    response_model=RouteOptimizeResponse,
+)
+def optimize_collection_route(
+    payload: RouteOptimizeRequest,
+    db: Session = Depends(get_db),
+):
+    bins = []
+
+    if payload.bin_ids:
+        for bin_id in payload.bin_ids:
+            row = db.get(WasteBin, bin_id)
+
+            if not row:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Bin {bin_id} not found",
+                )
+
+            bins.append(row)
+
+    else:
+        # When no bins are supplied explicitly,
+        # automatically select bins needing attention.
+        bins = (
+            db.query(WasteBin)
+            .filter(WasteBin.fill_level >= 70)
+            .order_by(WasteBin.fill_level.desc())
+            .all()
+        )
+
+    if not bins:
+        return {
+            "route": [],
+            "total_distance_km": 0.0,
+            "number_of_stops": 0,
+        }
+
+    for row in bins:
+        age_hours = max(
+            (
+                datetime.utcnow()
+                - row.updated_at
+            ).total_seconds()
+            / 3600.0,
+            0,
+        )
+
+        row._route_priority = collection_priority(
+            row.fill_level,
+            age_hours,
+        )
+
+    return optimize_route(
+        bins=bins,
+        start_latitude=payload.start_latitude,
+        start_longitude=payload.start_longitude,
+    )
